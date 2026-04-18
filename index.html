@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DMARC Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+/* ─── Reset & Variables ─────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:           #f9f9f7;
+  --surface:      #ffffff;
+  --surface2:     #f3f3f0;
+  --surface3:     #e8e8e4;
+  --text:         #111111;
+  --text2:        #555550;
+  --text3:        #999990;
+  --border:       rgba(0,0,0,.09);
+  --border2:      rgba(0,0,0,.16);
+  --green:        #2d9e5f;
+  --green-bg:     #e8f7ef;
+  --green-text:   #1a6b3e;
+  --amber:        #c97b1a;
+  --amber-bg:     #fef3e0;
+  --amber-text:   #8a5210;
+  --red:          #d94040;
+  --red-bg:       #fdeaea;
+  --red-text:     #9b2020;
+  --blue:         #2b6cb0;
+  --blue-bg:      #ebf4ff;
+  --blue-text:    #1a4a80;
+  --navy:         #0f172a;
+  --radius:       10px;
+  --radius-lg:    14px;
+  --mono:         'DM Mono', monospace;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ─── Layout ────────────────────────────────────────────────────── */
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+
+.topbar {
+  background: var(--navy);
+  padding: 0 1.5rem;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.topbar-brand { display: flex; align-items: center; gap: 10px; }
+.topbar-brand span { font-size: 15px; font-weight: 600; color: #fff; }
+.topbar-brand small { font-size: 11px; color: #94a3b8; font-family: var(--mono); }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.last-updated { font-size: 11px; color: #64748b; font-family: var(--mono); }
+.refresh-btn {
+  background: transparent;
+  border: 0.5px solid #334155;
+  color: #94a3b8;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all .15s;
+}
+.refresh-btn:hover { background: #1e293b; color: #fff; }
+
+.main { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1.5rem 3rem; width: 100%; }
+
+/* ─── Config Banner ─────────────────────────────────────────────── */
+.config-banner {
+  background: var(--amber-bg);
+  border: 0.5px solid #f5c842;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--amber-text);
+}
+.config-banner.hidden { display: none; }
+.config-banner code { background: rgba(0,0,0,.06); border-radius: 4px; padding: 1px 5px; font-family: var(--mono); font-size: 12px; }
+.config-btn {
+  margin-left: auto;
+  background: var(--amber-text);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* ─── Config Modal ──────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  width: 520px;
+  max-width: 95vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+.modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.modal p  { font-size: 12px; color: var(--text3); margin-bottom: 1.25rem; }
+.field { margin-bottom: 12px; }
+.field label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 4px; }
+.field input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 0.5px solid var(--border2);
+  border-radius: 7px;
+  font-size: 13px;
+  font-family: var(--mono);
+  background: var(--surface2);
+  color: var(--text);
+  outline: none;
+}
+.field input:focus { border-color: var(--blue); }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1rem; }
+.btn-primary {
+  background: var(--navy);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 8px 18px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+.btn-secondary {
+  background: transparent;
+  color: var(--text2);
+  border: 0.5px solid var(--border2);
+  border-radius: 7px;
+  padding: 8px 18px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* ─── Tabs ──────────────────────────────────────────────────────── */
+.tabs { display: flex; gap: 4px; background: var(--surface2); border-radius: var(--radius); padding: 4px; margin-bottom: 1.25rem; }
+.tab { flex: 1; padding: 7px 10px; font-size: 13px; font-weight: 500; border: none; background: transparent; color: var(--text2); border-radius: 7px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all .15s; }
+.tab.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.tab:hover:not(.active) { background: var(--surface3); }
+.view { display: none; } .view.active { display: block; }
+
+/* ─── Hero Cards ────────────────────────────────────────────────── */
+.hero { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 1.25rem; }
+.hero-card { border-radius: var(--radius-lg); padding: 16px 18px; }
+.hero-card.dark  { background: var(--navy); }
+.hero-card.ok    { background: var(--green-bg); }
+.hero-card.warn  { background: var(--amber-bg); }
+.hero-card.info  { background: var(--blue-bg); }
+.hero-label { font-size: 10px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; opacity: .55; margin-bottom: 6px; }
+.hero-num   { font-size: 34px; font-weight: 600; line-height: 1; margin-bottom: 2px; font-family: var(--mono); }
+.hero-sub   { font-size: 11px; opacity: .5; }
+.hero-card.dark .hero-label, .hero-card.dark .hero-num, .hero-card.dark .hero-sub { color: #fff; }
+.hero-card.ok   .hero-num { color: var(--green-text); }
+.hero-card.warn .hero-num { color: var(--amber-text); }
+.hero-card.info .hero-num { color: var(--blue-text); }
+
+/* ─── Domain Block ──────────────────────────────────────────────── */
+.domain-block { border: 0.5px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 12px; background: var(--surface); }
+.domain-header { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; background: var(--surface2); border-bottom: 0.5px solid var(--border); cursor: pointer; user-select: none; flex-wrap: wrap; gap: 6px; }
+.domain-header:hover { background: var(--surface3); }
+.domain-name  { font-size: 14px; font-weight: 600; font-family: var(--mono); color: var(--text); }
+.domain-pills { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+.chevron { font-size: 11px; color: var(--text3); transition: transform .2s; margin-left: 4px; }
+.domain-block.collapsed .domain-body  { display: none; }
+.domain-block.collapsed .chevron { transform: rotate(-90deg); }
+.domain-body  { padding: 14px 16px; }
+
+/* ─── Pills ─────────────────────────────────────────────────────── */
+.pill { font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+.pill.ok   { background: var(--green-bg); color: var(--green-text); }
+.pill.warn { background: var(--amber-bg); color: var(--amber-text); }
+.pill.info { background: var(--blue-bg);  color: var(--blue-text); }
+.pill.dark { background: var(--navy); color: #fff; }
+
+/* ─── Stat Row ──────────────────────────────────────────────────── */
+.stat-row { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; margin-bottom: 14px; }
+.stat-box { background: var(--surface2); border-radius: 8px; padding: 10px 12px; }
+.stat-label { font-size: 11px; color: var(--text3); margin-bottom: 3px; }
+.stat-val { font-size: 22px; font-weight: 600; font-family: var(--mono); }
+.stat-val.green { color: var(--green); }
+.stat-val.amber { color: var(--amber); }
+.stat-val.red   { color: var(--red); }
+
+/* ─── Alert Box ─────────────────────────────────────────────────── */
+.alert { border-radius: 8px; padding: 10px 13px; font-size: 12.5px; line-height: 1.55; margin-bottom: 14px; display: flex; gap: 8px; align-items: flex-start; }
+.alert.ok   { background: var(--green-bg); color: var(--green-text); border: 0.5px solid #4ade80; }
+.alert.warn { background: var(--amber-bg); color: var(--amber-text); border: 0.5px solid #f5c842; }
+.alert.info { background: var(--blue-bg);  color: var(--blue-text);  border: 0.5px solid #93c5fd; }
+
+/* ─── Bar Chart ─────────────────────────────────────────────────── */
+.chart-label { font-size: 11px; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+.day-bars { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.day-bar-row { display: flex; align-items: center; gap: 8px; }
+.day-bar-label { font-size: 11px; color: var(--text3); font-family: var(--mono); width: 54px; flex-shrink: 0; }
+.bar-track { flex: 1; height: 18px; background: var(--surface2); border-radius: 4px; overflow: hidden; display: flex; }
+.bar-seg { height: 100%; display: flex; align-items: center; padding-left: 6px; font-size: 10px; font-weight: 500; color: #fff; min-width: 0; transition: width .4s ease; }
+.bar-seg.green { background: var(--green); }
+.bar-seg.amber { background: var(--amber); }
+.bar-count { font-size: 11px; color: var(--text2); width: 30px; text-align: right; flex-shrink: 0; font-family: var(--mono); }
+
+/* ─── Table ─────────────────────────────────────────────────────── */
+.detail-title { font-size: 11px; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; margin-top: 4px; }
+.tbl-wrap { border: 0.5px solid var(--border); border-radius: 8px; overflow: hidden; overflow-x: auto; }
+.dtable { width: 100%; border-collapse: collapse; font-size: 12px; }
+.dtable th { background: var(--surface2); color: var(--text3); font-weight: 500; text-align: left; padding: 6px 8px; border-bottom: 0.5px solid var(--border); white-space: nowrap; }
+.dtable td { padding: 6px 8px; color: var(--text); border-bottom: 0.5px solid var(--border); white-space: nowrap; }
+.dtable tr:last-child td { border-bottom: none; }
+.dtable tr:nth-child(even) td { background: var(--surface2); }
+.ip  { font-family: var(--mono); font-size: 11px; }
+.chk { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 500; padding: 2px 7px; border-radius: 20px; }
+.chk.p { background: var(--green-bg); color: var(--green-text); }
+.chk.f { background: var(--amber-bg); color: var(--amber-text); }
+.sel { font-size: 10px; font-family: var(--mono); background: var(--surface2); color: var(--text2); border: 0.5px solid var(--border2); border-radius: 4px; padding: 1px 5px; margin-left: 3px; }
+
+/* ─── Sources ───────────────────────────────────────────────────── */
+.sources-grid { display: flex; flex-direction: column; gap: 8px; }
+.src-card { border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px 14px; display: flex; align-items: center; gap: 14px; background: var(--surface); }
+.src-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.src-info  { flex: 1; min-width: 0; }
+.src-ip    { font-size: 13px; font-weight: 500; font-family: var(--mono); color: var(--text); }
+.src-desc  { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.src-badges { margin-top: 6px; display: flex; gap: 5px; flex-wrap: wrap; }
+.src-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.src-total { font-size: 20px; font-weight: 600; font-family: var(--mono); color: var(--text); }
+.src-label { font-size: 10px; color: var(--text3); }
+
+/* ─── Timeline ──────────────────────────────────────────────────── */
+.timeline { display: flex; flex-direction: column; gap: 10px; }
+.tday { border: 0.5px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.tday-header { padding: 10px 14px; background: var(--surface2); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; }
+.tday-date { font-size: 13px; font-weight: 600; color: var(--text); }
+.tday-body { padding: 12px 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tday-domain { border: 0.5px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.tday-domain-name { font-size: 11px; font-weight: 600; font-family: var(--mono); color: var(--text); margin-bottom: 6px; }
+.tday-rows { display: flex; flex-direction: column; gap: 3px; }
+.tday-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--text2); gap: 8px; }
+.tday-row span:last-child { font-weight: 500; font-family: var(--mono); text-align: right; }
+.tday-empty { background: var(--surface2); }
+.tday-empty .tday-domain-name { color: var(--text3); }
+
+/* ─── Loading Skeleton ──────────────────────────────────────────── */
+.skeleton { background: linear-gradient(90deg, var(--surface2) 25%, var(--surface3) 50%, var(--surface2) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 6px; }
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+.skeleton-card { height: 88px; border-radius: var(--radius-lg); }
+.skeleton-block { height: 120px; border-radius: var(--radius-lg); margin-bottom: 12px; }
+.skeleton-row { height: 16px; margin-bottom: 8px; }
+
+/* ─── Empty / Error States ──────────────────────────────────────── */
+.empty-state { text-align: center; padding: 3rem 1rem; color: var(--text3); }
+.empty-state h3 { font-size: 15px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+.empty-state p  { font-size: 13px; }
+.error-banner { background: var(--red-bg); border: 0.5px solid #fca5a5; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--red-text); margin-bottom: 12px; display: none; }
+.error-banner.visible { display: block; }
+
+/* ─── Reporters ─────────────────────────────────────────────────── */
+.reporters-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+.rep-card { border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px 14px; background: var(--surface); }
+.rep-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.rep-org  { font-size: 11px; color: var(--text3); margin-bottom: 8px; }
+.rep-stat { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); margin-top: 4px; }
+.rep-stat span:last-child { font-weight: 600; font-family: var(--mono); }
+
+/* ─── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  .hero        { grid-template-columns: repeat(2,1fr); }
+  .stat-row    { grid-template-columns: repeat(2,1fr); }
+  .tday-body   { grid-template-columns: 1fr; }
+  .reporters-grid { grid-template-columns: 1fr; }
+  .tabs .tab   { font-size: 11px; padding: 6px 5px; }
+  .main        { padding: 1rem 1rem 2rem; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ══════════ TOPBAR ══════════ -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <span>DMARC Dashboard</span>
+      <small id="domain-badge">cargando...</small>
+    </div>
+    <div class="topbar-right">
+      <span class="last-updated" id="last-updated">—</span>
+      <button class="refresh-btn" onclick="loadData()">↻ Actualizar</button>
+      <button class="refresh-btn" onclick="openConfig()">⚙ Config</button>
+    </div>
+  </header>
+
+  <!-- ══════════ CONFIG MODAL ══════════ -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+      <h2>Configurar conexión Supabase</h2>
+      <p>Introduce las credenciales de tu proyecto Supabase. Se guardan solo en localStorage de este navegador.</p>
+      <div class="field">
+        <label>Supabase URL</label>
+        <input type="url" id="cfg-url" placeholder="https://xxxxxxxxxxxxxxxx.supabase.co">
+      </div>
+      <div class="field">
+        <label>Anon Key (clave pública)</label>
+        <input type="text" id="cfg-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeConfig()">Cancelar</button>
+        <button class="btn-primary" onclick="saveConfig()">Guardar y conectar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ MAIN ══════════ -->
+  <main class="main">
+
+    <!-- Config banner (visible si no hay credenciales) -->
+    <div class="config-banner" id="config-banner">
+      <span>⚠</span>
+      <div>
+        Configura tu conexión a Supabase para ver los datos en tiempo real.
+        Necesitas la <code>SUPABASE_URL</code> y la <code>SUPABASE_ANON_KEY</code> de tu proyecto.
+      </div>
+      <button class="config-btn" onclick="openConfig()">Configurar →</button>
+    </div>
+
+    <!-- Error banner -->
+    <div class="error-banner" id="error-banner"></div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="showView('overview',this)">Resumen</button>
+      <button class="tab" onclick="showView('timeline',this)">Por días</button>
+      <button class="tab" onclick="showView('sources',this)">Fuentes</button>
+      <button class="tab" onclick="showView('reporters',this)">Reporteros</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="view active" id="view-overview">
+
+      <!-- Hero metrics -->
+      <div class="hero" id="hero-cards">
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card"></div>
+      </div>
+
+      <!-- Domain blocks (se renderizan dinámicamente) -->
+      <div id="domain-blocks">
+        <div class="skeleton skeleton-block"></div>
+        <div class="skeleton skeleton-block"></div>
+      </div>
+
+    </div>
+
+    <!-- ══ TIMELINE ══ -->
+    <div class="view" id="view-timeline">
+      <div class="timeline" id="timeline-content">
+        <div class="skeleton skeleton-block"></div>
+        <div class="skeleton skeleton-block"></div>
+        <div class="skeleton skeleton-block"></div>
+      </div>
+    </div>
+
+    <!-- ══ SOURCES ══ -->
+    <div class="view" id="view-sources">
+      <div style="font-size:12px;color:var(--text3);margin-bottom:12px;">
+        IPs y servicios que han enviado correo en nombre de tus dominios.
+      </div>
+      <div class="sources-grid" id="sources-content">
+        <div class="skeleton skeleton-block"></div>
+        <div class="skeleton skeleton-block"></div>
+      </div>
+    </div>
+
+    <!-- ══ REPORTERS ══ -->
+    <div class="view" id="view-reporters">
+      <div style="font-size:12px;color:var(--text3);margin-bottom:12px;">
+        Organizaciones que han enviado informes DMARC de tus dominios.
+      </div>
+      <div class="reporters-grid" id="reporters-content">
+        <div class="skeleton skeleton-block"></div>
+        <div class="skeleton skeleton-block"></div>
+        <div class="skeleton skeleton-block"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   CONFIGURACIÓN  —  edita estas constantes o usa el modal
+   ════════════════════════════════════════════════════════════════ */
+const CONFIG_KEY = 'dmarc_supabase_config';
+
+function getConfig() {
+  try {
+    const stored = localStorage.getItem(CONFIG_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed.url === 'string' && typeof parsed.key === 'string') {
+        return parsed;
+      }
+    }
+  } catch(e) {}
+  // Fallback a variables hardcoded (útil para desarrollo)
+  return {
+    url: '',   // ← reemplaza con tu Supabase URL
+    key: '',   // ← reemplaza con tu anon key
+  };
+}
+
+function saveConfig() {
+  const url = document.getElementById('cfg-url').value.trim();
+  const key = document.getElementById('cfg-key').value.trim();
+  if (!url || !key) { alert('Rellena ambos campos'); return; }
+  localStorage.setItem(CONFIG_KEY, JSON.stringify({ url, key }));
+  closeConfig();
+  loadData();
+}
+
+function openConfig() {
+  const cfg = getConfig();
+  document.getElementById('cfg-url').value = cfg.url || '';
+  document.getElementById('cfg-key').value = cfg.key || '';
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+function closeConfig() {
+  document.getElementById('modal-overlay').classList.add('hidden');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SUPABASE REST CLIENT
+   ════════════════════════════════════════════════════════════════ */
+async function supabaseQuery(table, params = '') {
+  const { url, key } = getConfig();
+  if (!url || !key) return null;
+  const res = await fetch(`${url}/rest/v1/${table}?${params}`, {
+    headers: {
+      'apikey': key,
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    }
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CARGA DE DATOS
+   ════════════════════════════════════════════════════════════════ */
+let state = {
+  domains:   [],
+  reports:   [],
+  records:   [],
+  sources:   [],
+};
+let configPromptShown = false;
+
+function computeAuthStats(records = state.records) {
+  return records.reduce((acc, rec) => {
+    const count = rec.email_count || 0;
+    acc.total += count;
+    const dkimPass = rec.dkim_result === 'pass';
+    const spfPass = rec.spf_result === 'pass';
+    if (dkimPass || spfPass) acc.authenticated += count;
+    else acc.unauthenticated += count;
+    return acc;
+  }, { total: 0, authenticated: 0, unauthenticated: 0 });
+}
+
+async function loadData() {
+  const cfg = getConfig();
+  if (!cfg.url || !cfg.key) {
+    document.getElementById('config-banner').classList.remove('hidden');
+    if (!configPromptShown) {
+      openConfig();
+      configPromptShown = true;
+    }
+    return;
+  }
+  document.getElementById('config-banner').classList.add('hidden');
+  document.getElementById('error-banner').classList.remove('visible');
+
+  try {
+    const [domains, reports, records, sources] = await Promise.all([
+      supabaseQuery('dmarc_domains', 'select=*&active=eq.true&order=domain.asc'),
+      supabaseQuery('dmarc_reports', 'select=*&order=date_begin.desc&limit=500'),
+      supabaseQuery('dmarc_records', 'select=*&order=email_count.desc&limit=1000'),
+      supabaseQuery('dmarc_known_sources', 'select=*'),
+    ]);
+
+    state = { domains: domains||[], reports: reports||[], records: records||[], sources: sources||[] };
+
+    renderHero();
+    renderDomainBlocks();
+    renderTimeline();
+    renderSources();
+    renderReporters();
+
+    const domainNames = (domains||[]).map(d => d.domain).join(' · ');
+    document.getElementById('domain-badge').textContent = domainNames || '—';
+    document.getElementById('last-updated').textContent =
+      'Actualizado: ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+  } catch(err) {
+    const banner = document.getElementById('error-banner');
+    banner.textContent = `Error conectando a Supabase: ${err.message}. Revisa la configuración.`;
+    banner.classList.add('visible');
+    console.error(err);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   HELPERS
+   ════════════════════════════════════════════════════════════════ */
+function pill(text, type) {
+  return `<span class="pill ${type}">${text}</span>`;
+}
+
+function chk(result) {
+  if (result === 'pass') return `<span class="chk p">✓ pass</span>`;
+  if (result === 'fail') return `<span class="chk f">⚠ alineación</span>`;
+  return `<span class="chk">${result||'—'}</span>`;
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d + 'T00:00:00Z');
+  return dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
+function sumByDomain(domainId) {
+  const reps = state.reports.filter(r => r.domain_id === domainId);
+  return {
+    total:    reps.reduce((s,r) => s + (r.email_count||0), 0),
+    spfFail:  reps.reduce((s,r) => s + (r.spf_fail||0), 0),
+    spfPass:  reps.reduce((s,r) => s + (r.spf_pass||0), 0),
+    dkimFail: reps.reduce((s,r) => s + (r.dkim_fail||0), 0),
+    blocked:  reps.reduce((s,r) => s + (r.blocked||0), 0),
+    days:     [...new Set(reps.map(r => r.date_begin))].length,
+  };
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RENDER: HERO
+   ════════════════════════════════════════════════════════════════ */
+function renderHero() {
+  const totalEmails  = state.reports.reduce((s,r) => s + (r.email_count||0), 0);
+  const totalBlocked = state.reports.reduce((s,r) => s + (r.blocked||0), 0);
+  const totalSpfFail = state.reports.reduce((s,r) => s + (r.spf_fail||0), 0);
+  const reporterOrgs = [...new Set(state.reports.map(r => r.reporter_org).filter(Boolean))].length;
+  const authStats = computeAuthStats();
+
+  document.getElementById('hero-cards').innerHTML = `
+    <div class="hero-card dark">
+      <div class="hero-label">Total enviados</div>
+      <div class="hero-num">${totalEmails.toLocaleString()}</div>
+      <div class="hero-sub">${state.domains.length} dominios activos</div>
+    </div>
+    <div class="hero-card ok">
+      <div class="hero-label">Autenticados</div>
+      <div class="hero-num" style="color:var(--green-text)">${authStats.authenticated.toLocaleString()}</div>
+      <div class="hero-sub" style="color:var(--green-text);opacity:.6">${totalBlocked.toLocaleString()} bloqueados</div>
+    </div>
+    <div class="hero-card warn">
+      <div class="hero-label">SPF sin alinear</div>
+      <div class="hero-num">${totalSpfFail.toLocaleString()}</div>
+      <div class="hero-sub" style="color:var(--amber-text);opacity:.6">salvados por DKIM</div>
+    </div>
+    <div class="hero-card info">
+      <div class="hero-label">Reporteros</div>
+      <div class="hero-num">${reporterOrgs}</div>
+      <div class="hero-sub" style="color:var(--blue-text);opacity:.6">organizaciones</div>
+    </div>
+  `;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RENDER: DOMAIN BLOCKS
+   ════════════════════════════════════════════════════════════════ */
+function renderDomainBlocks() {
+  if (!state.domains.length) {
+    document.getElementById('domain-blocks').innerHTML =
+      `<div class="empty-state"><h3>Sin dominios</h3><p>Añade dominios en la tabla dmarc_domains de Supabase.</p></div>`;
+    return;
+  }
+
+  // Calcular el max para escalar las barras
+  const allTotals = state.domains.map(d => {
+    const reps = state.reports.filter(r => r.domain_id === d.id);
+    return [...new Set(reps.map(r => r.date_begin))].map(date => {
+      const dayReps = reps.filter(r => r.date_begin === date);
+      return dayReps.reduce((s,r) => s + (r.email_count||0), 0);
+    });
+  }).flat();
+  const maxDaily = Math.max(...allTotals, 1);
+
+  document.getElementById('domain-blocks').innerHTML = state.domains.map(domain => {
+    const stats = sumByDomain(domain.id);
+    const reps   = state.reports.filter(r => r.domain_id === domain.id);
+    const dates  = [...new Set(reps.map(r => r.date_begin))].sort().slice(-9);
+    const hasSpfIssue = stats.spfFail > 0;
+
+    // Barras por día
+    const bars = dates.map(date => {
+      const dayReps = reps.filter(r => r.date_begin === date);
+      const total   = dayReps.reduce((s,r) => s + (r.email_count||0), 0);
+      const spfFail = dayReps.reduce((s,r) => s + (r.spf_fail||0), 0);
+      const spfPass = total - spfFail;
+      const pPass   = Math.round((spfPass / (maxDaily||1)) * 100);
+      const pFail   = Math.round((spfFail / (maxDaily||1)) * 100);
+      return `
+        <div class="day-bar-row">
+          <span class="day-bar-label">${fmtDate(date)}</span>
+          <div class="bar-track">
+            ${spfPass > 0 ? `<div class="bar-seg green" style="width:${pPass}%"></div>` : ''}
+            ${spfFail > 0 ? `<div class="bar-seg amber" style="width:${pFail}%"></div>` : ''}
+          </div>
+          <span class="bar-count">${total}</span>
+        </div>`;
+    }).join('');
+
+    // Últimos records para la tabla
+    const domainRecs = state.records
+      .filter(rec => reps.some(r => r.id === rec.report_id))
+      .slice(0, 10);
+
+    const tableRows = domainRecs.map((rec, i) => {
+      const rep = reps.find(r => r.id === rec.report_id);
+      const disposition = rec.policy_disposition || rec.disposition || rep?.policy_published_p || 'none';
+      const dispClass = disposition === 'none' ? 'p' : 'f';
+      return `<tr>
+        <td>${fmtDate(rep?.date_begin)}</td>
+        <td class="ip">${rec.source_ip}</td>
+        <td>${rec.email_count}</td>
+        <td>${chk(rec.dkim_result)}${rec.dkim_selector ? `<span class="sel">${rec.dkim_selector}</span>` : ''}</td>
+        <td>${chk(rec.spf_result)}</td>
+        <td>${rec.envelope_from ? `<span class="ip">${rec.envelope_from}</span>` : '—'}</td>
+        <td><span class="chk ${dispClass}">${disposition}</span></td>
+      </tr>`;
+    }).join('');
+
+    const dkimPct  = stats.total ? Math.round(((stats.total - stats.dkimFail) / stats.total) * 100) : 100;
+    const spfPct   = stats.total ? Math.round((stats.spfPass / stats.total) * 100) : 100;
+
+    return `
+    <div class="domain-block" id="block-${domain.id}">
+      <div class="domain-header" onclick="toggleBlock('block-${domain.id}')">
+        <span class="domain-name">${domain.domain}</span>
+        <div class="domain-pills">
+          ${pill(`${stats.total.toLocaleString()} emails`, 'info')}
+          ${pill(`DKIM ${dkimPct}%`, dkimPct === 100 ? 'ok' : 'warn')}
+          ${pill(`SPF ${spfPct}%`, spfPct === 100 ? 'ok' : 'warn')}
+          ${stats.blocked > 0 ? pill(`${stats.blocked} bloqueados`, 'warn') : pill('0 bloqueados', 'ok')}
+          ${hasSpfIssue ? pill('⚠ SPF alias', 'warn') : ''}
+          <span class="chevron">▾</span>
+        </div>
+      </div>
+      <div class="domain-body">
+        <div class="stat-row">
+          <div class="stat-box"><div class="stat-label">Enviados</div><div class="stat-val">${stats.total.toLocaleString()}</div></div>
+          <div class="stat-box"><div class="stat-label">DKIM pass</div><div class="stat-val green">${(stats.total - stats.dkimFail).toLocaleString()}</div></div>
+          <div class="stat-box"><div class="stat-label">SPF alineado</div><div class="stat-val ${hasSpfIssue ? 'amber' : 'green'}">${stats.spfPass.toLocaleString()}</div></div>
+          <div class="stat-box"><div class="stat-label">Bloqueados</div><div class="stat-val ${stats.blocked > 0 ? 'red' : 'green'}">${stats.blocked}</div></div>
+        </div>
+        ${hasSpfIssue
+          ? `<div class="alert warn"><span>⚠</span><div>SPF falla alineación DMARC en <strong>${stats.spfFail} emails</strong> — patrón de alias domain Google Workspace (envelope-from sale como dominio primario). DKIM salva todos estos correos. Sin correos bloqueados.</div></div>`
+          : `<div class="alert ok"><span>✓</span> Autenticación perfecta — DKIM y SPF alinean en el 100% de los correos procesados.</div>`
+        }
+        ${dates.length ? `
+          <div class="chart-label">Emails por día · verde = SPF alineado · ámbar = solo DKIM</div>
+          <div class="day-bars">${bars}</div>
+        ` : ''}
+        ${domainRecs.length ? `
+          <div class="detail-title">Registros recientes</div>
+          <div class="tbl-wrap"><table class="dtable">
+            <thead><tr><th>Día</th><th>IP origen</th><th>Emails</th><th>DKIM</th><th>SPF eval.</th><th>Envelope-from</th><th>Disposición</th></tr></thead>
+            <tbody>${tableRows}</tbody>
+          </table></div>
+        ` : `<div class="empty-state"><p>Sin registros individuales aún.</p></div>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RENDER: TIMELINE
+   ════════════════════════════════════════════════════════════════ */
+function renderTimeline() {
+  const allDates = [...new Set(state.reports.map(r => r.date_begin))].sort().reverse();
+
+  if (!allDates.length) {
+    document.getElementById('timeline-content').innerHTML =
+      `<div class="empty-state"><h3>Sin datos</h3><p>Los reportes aparecerán aquí una vez procesados por n8n.</p></div>`;
+    return;
+  }
+
+  const html = allDates.map(date => {
+    const dayReps  = state.reports.filter(r => r.date_begin === date);
+    const dayTotal = dayReps.reduce((s,r) => s + (r.email_count||0), 0);
+    const dayFail  = dayReps.reduce((s,r) => s + (r.spf_fail||0), 0);
+    const dayBlk   = dayReps.reduce((s,r) => s + (r.blocked||0), 0);
+
+    const domainCols = state.domains.map(domain => {
+      const domReps = dayReps.filter(r => r.domain_id === domain.id);
+      if (!domReps.length) {
+        return `<div class="tday-domain tday-empty">
+          <div class="tday-domain-name">${domain.domain}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:6px">Sin actividad</div>
+        </div>`;
+      }
+      const tot  = domReps.reduce((s,r) => s + (r.email_count||0), 0);
+      const fail = domReps.reduce((s,r) => s + (r.spf_fail||0), 0);
+      const orgs = [...new Set(domReps.map(r => r.reporter_org || 'Desconocido'))].join(', ');
+      return `<div class="tday-domain" ${fail > 0 ? 'style="border-color:#f5c842"' : ''}>
+        <div class="tday-domain-name">${domain.domain}</div>
+        <div class="tday-rows">
+          <div class="tday-row"><span>Reporters</span><span>${orgs}</span></div>
+          <div class="tday-row"><span>Enviados</span><span>${tot}</span></div>
+          <div class="tday-row"><span>SPF alineados</span><span style="color:${fail > 0 ? 'var(--amber)' : 'var(--green)'}">${tot - fail} / ${tot}</span></div>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="tday">
+      <div class="tday-header">
+        <span class="tday-date">${fmtDate(date)}</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${pill(`${dayTotal} emails`, 'info')}
+          ${dayFail > 0 ? pill(`${dayFail} SPF warn`, 'warn') : ''}
+          ${dayBlk  > 0 ? pill(`${dayBlk} bloqueados`, 'warn') : pill('0 bloqueados', 'ok')}
+        </div>
+      </div>
+      <div class="tday-body">${domainCols}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('timeline-content').innerHTML = html;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RENDER: SOURCES
+   ════════════════════════════════════════════════════════════════ */
+function renderSources() {
+  // Agrupar records por source_ip
+  const ipMap = {};
+  state.records.forEach(rec => {
+    const ip = rec.source_ip;
+    if (!ipMap[ip]) ipMap[ip] = { total: 0, dkimFail: 0, spfFail: 0, selectors: new Set() };
+    ipMap[ip].total    += rec.email_count || 0;
+    if (rec.dkim_result === 'fail') ipMap[ip].dkimFail += rec.email_count || 0;
+    if (rec.spf_result  === 'fail') ipMap[ip].spfFail  += rec.email_count || 0;
+    if (rec.dkim_selector) ipMap[ip].selectors.add(rec.dkim_selector);
+  });
+
+  const sorted = Object.entries(ipMap).sort((a,b) => b[1].total - a[1].total);
+
+  if (!sorted.length) {
+    document.getElementById('sources-content').innerHTML =
+      `<div class="empty-state"><h3>Sin fuentes</h3><p>Las IPs aparecerán aquí tras procesar reportes.</p></div>`;
+    return;
+  }
+
+  const knownMap = {};
+  state.sources.forEach(s => { knownMap[s.ip] = s; });
+
+  const html = sorted.map(([ip, stats]) => {
+    const known = knownMap[ip];
+    const dkimOk = stats.dkimFail === 0;
+    const spfOk  = stats.spfFail  === 0;
+    const icon = known
+      ? (known.provider === 'google' ? '🔵' : known.provider === 'microsoft' ? '🟦' : '🖥')
+      : '❓';
+    const label = known ? known.label : 'Fuente desconocida';
+    const sels  = stats.selectors.size ? [...stats.selectors].join(', ') : '—';
+
+    return `<div class="src-card" ${!known ? 'style="border-color:#f5c842"' : ''}>
+      <div class="src-icon" style="background:var(--surface2)">${icon}</div>
+      <div class="src-info">
+        <div class="src-ip">${ip}${!known ? ` <span class="pill warn" style="font-size:10px">desconocida</span>` : ''}</div>
+        <div class="src-desc">${label} · selector(es): ${sels}</div>
+        <div class="src-badges">
+          ${pill(`DKIM ${dkimOk ? '100%' : 'fallos'}`, dkimOk ? 'ok' : 'warn')}
+          ${pill(`SPF ${spfOk ? '100%' : stats.spfFail + ' fallos'}`, spfOk ? 'ok' : 'warn')}
+        </div>
+      </div>
+      <div class="src-stats">
+        <div class="src-total">${stats.total.toLocaleString()}</div>
+        <div class="src-label">emails</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('sources-content').innerHTML = html;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RENDER: REPORTERS
+   ════════════════════════════════════════════════════════════════ */
+function renderReporters() {
+  const orgMap = {};
+  state.reports.forEach(r => {
+    const org = r.reporter_org || 'Desconocido';
+    if (!orgMap[org]) orgMap[org] = { emails: 0, domains: new Set(), dates: new Set(), reportIds: new Set() };
+    orgMap[org].emails += r.email_count || 0;
+    if (r.id) orgMap[org].reportIds.add(r.id);
+    const dom = state.domains.find(d => d.id === r.domain_id);
+    if (dom) orgMap[org].domains.add(dom.domain);
+    if (r.date_begin) orgMap[org].dates.add(r.date_begin);
+  });
+
+  const sorted = Object.entries(orgMap).sort((a,b) => b[1].emails - a[1].emails);
+
+  if (!sorted.length) {
+    document.getElementById('reporters-content').innerHTML =
+      `<div class="empty-state"><h3>Sin reporteros</h3><p>Los reporteros aparecerán aquí tras procesar reportes DMARC.</p></div>`;
+    return;
+  }
+
+  const totalEmails  = state.reports.reduce((s,r) => s + (r.email_count||0), 0);
+  const totalBlocked = state.reports.reduce((s,r) => s + (r.blocked||0), 0);
+  const authStats = computeAuthStats();
+  const allDomains   = [...new Set(state.reports.map(r => state.domains.find(d=>d.id===r.domain_id)?.domain).filter(Boolean))];
+  const allDates     = [...new Set(state.reports.map(r => r.date_begin))];
+  const globalAuthPct = authStats.total ? Math.round((authStats.authenticated / authStats.total) * 100) : 100;
+
+  const cards = sorted.map(([org, data]) => {
+    const orgReportIds = data.reportIds;
+    const orgRecords = state.records.filter(rec => orgReportIds.has(rec.report_id));
+    const orgAuth = computeAuthStats(orgRecords);
+    const orgAuthPct = orgAuth.total ? Math.round((orgAuth.authenticated / orgAuth.total) * 100) : 100;
+    return `
+    <div class="rep-card">
+      <div class="rep-name">${org}</div>
+      <div class="rep-org">${orgReportIds.size} reportes</div>
+      <div class="rep-stat"><span>Dominios</span><span>${[...data.domains].join(', ')}</span></div>
+      <div class="rep-stat"><span>Días reportados</span><span>${data.dates.size}</span></div>
+      <div class="rep-stat"><span>Emails reportados</span><span>${data.emails.toLocaleString()}</span></div>
+      <div style="margin-top:8px">${pill(`${orgAuthPct}% autenticados`, orgAuthPct === 100 ? 'ok' : 'warn')}</div>
+    </div>`;
+  }).join('');
+
+  const summary = `
+    <div class="rep-card" style="grid-column:span 2;">
+      <div class="rep-name">Resumen global</div>
+      <div class="rep-org">todos los reporteros combinados</div>
+      <div class="rep-stat"><span>Total emails</span><span>${totalEmails.toLocaleString()}</span></div>
+      <div class="rep-stat"><span>Autenticados</span><span>${authStats.authenticated.toLocaleString()}</span></div>
+      <div class="rep-stat"><span>Bloqueados</span><span>${totalBlocked}</span></div>
+      <div class="rep-stat"><span>Dominios activos</span><span>${allDomains.join(', ')}</span></div>
+      <div class="rep-stat"><span>Días con datos</span><span>${allDates.length}</span></div>
+      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+        ${pill(`${globalAuthPct}% autenticación global`, globalAuthPct === 100 ? 'ok' : 'warn')}
+        ${pill(`${authStats.unauthenticated.toLocaleString()} no autenticados`, authStats.unauthenticated > 0 ? 'warn' : 'ok')}
+        ${pill(`${allDates.length} días con datos`, 'info')}
+      </div>
+    </div>`;
+
+  document.getElementById('reporters-content').innerHTML = cards + summary;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   UI HELPERS
+   ════════════════════════════════════════════════════════════════ */
+function showView(id, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('view-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function toggleBlock(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('modal-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeConfig();
+});
+
+/* ════════════════════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════════════════════ */
+// Auto-refresh cada 5 minutos
+setInterval(loadData, 5 * 60 * 1000);
+
+// Carga inicial
+loadData();
+</script>
+</body>
+</html>
