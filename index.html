@@ -294,12 +294,37 @@ body {
 
 /* ─── Responsive ────────────────────────────────────────────────── */
 @media (max-width: 700px) {
-  .hero        { grid-template-columns: repeat(2,1fr); }
-  .stat-row    { grid-template-columns: repeat(2,1fr); }
-  .tday-body   { grid-template-columns: 1fr; }
+  .hero           { grid-template-columns: repeat(2,1fr); }
+  .stat-row       { grid-template-columns: repeat(2,1fr); }
+  .tday-body      { grid-template-columns: 1fr; }
   .reporters-grid { grid-template-columns: 1fr; }
-  .tabs .tab   { font-size: 11px; padding: 6px 5px; }
-  .main        { padding: 1rem 1rem 2rem; }
+  .reporters-grid > * { grid-column: span 1 !important; }
+  .tabs           { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tabs .tab      { font-size: 11px; padding: 6px 5px; flex: none; }
+  .main           { padding: 1rem 1rem 2rem; }
+  .last-updated   { display: none; }
+  .topbar-brand small { display: none; }
+  .src-card       { flex-wrap: wrap; }
+  .src-stats      { align-items: flex-start; }
+}
+
+@media (max-width: 480px) {
+  .hero           { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .hero-num       { font-size: 26px; }
+  .hero-card      { padding: 12px 14px; }
+  .stat-row       { grid-template-columns: 1fr 1fr; }
+  .topbar         { padding: 0 1rem; height: 48px; }
+  .topbar-brand span { font-size: 13px; }
+  .topbar-right   { gap: 6px; }
+  .refresh-btn    { padding: 4px 8px; font-size: 11px; }
+  .config-banner  { flex-wrap: wrap; }
+  .config-btn     { margin-left: 0; width: 100%; text-align: center; margin-top: 4px; }
+  .domain-header  { padding: 10px 12px; }
+  .domain-body    { padding: 12px 12px; }
+  .dtable th,
+  .dtable td      { padding: 5px 6px; font-size: 11px; }
+  .tday-header    { padding: 8px 12px; }
+  .tday-body      { padding: 10px 12px; }
 }
 </style>
 </head>
