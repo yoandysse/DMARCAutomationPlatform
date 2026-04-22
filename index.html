@@ -676,9 +676,14 @@ function renderDomainBlocks() {
         </div>`;
     }).join('');
 
-    // Últimos records para la tabla
+    // Últimos records para la tabla — más recientes primero
     const domainRecs = state.records
       .filter(rec => reps.some(r => r.id === rec.report_id))
+      .sort((a, b) => {
+        const dA = reps.find(r => r.id === a.report_id)?.date_begin || '';
+        const dB = reps.find(r => r.id === b.report_id)?.date_begin || '';
+        return dB.localeCompare(dA);
+      })
       .slice(0, 10);
 
     const tableRows = domainRecs.map((rec, i) => {
